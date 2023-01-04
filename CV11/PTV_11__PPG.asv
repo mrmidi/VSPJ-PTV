@@ -1,0 +1,121 @@
+%% Realizace algoritmu pro odhad tepové frekvence (TF) z fotopletysmogramů (PPG)
+%% nasnímaných pomocí chytrého telefonu
+
+% 1. Nahrajte 3 cca 10-20 sec dlouhá videa prstu přiloženého na čočku a
+% diodu fotoaparátu. Nastavte kvalitu maximálně HD. Naměřené signály můžete
+% sdílet se spolužáky a otestovat tak algoritmus na vyšším počtu dat.
+% Data sdílejte zde: https://vspj-my.sharepoint.com/personal/saclov01_vspj_cz/_layouts/15/onedrive.aspx?ga=1&id=%2Fpersonal%2Fsaclov01%5Fvspj%5Fcz%2FDocuments%2FPTV%5F11
+
+% 2. Načtěte video do Matlabu. Nejprve použijte funkci VideoReader. Tím
+% načtete strukturu (objekt) s informacemi o videu.
+% Poté funkci read (na vytvořený objekt), čímž načtete video 4D matice.
+% Uložte si do proměnných počet snímků videa, a vzorkovací frekvenci tj.
+% framerate, čili počet snímku za sekundu.
+
+v = VideoReader('BLOOD.MOV');
+
+% 2. Rozdělte video tak, aby jste vždy zachovali jenom jednu barevnou
+% složku. První index 4D matice udává počet pixelů v ose x (šířku obrazu/videa), 
+% druhý počet pixelů v ose y (výšku obrazu), třetí barevnou vrstvu, a čtvrtý 
+% pořadí snímku. Zobrazte první snímek - každou baru zvlášť.
+
+sizex = v.Width;
+sizey = v.Height;
+colors = v.VideoFormat;
+frames = v.NumberOfFrames;
+
+framerate = v.FrameRate;
+
+
+frame1 = read(v,1);
+redchannel = frame1(:,:,1,1);
+greenchannel = frame1(:,:,2,1);
+bluechannel = frame1(:,:,3,1);
+
+figure(1);
+subplot(1,3,1);
+imshow(redchannel);
+subplot(1,3,2);
+imshow(greenchannel);
+subplot(1,3,3);
+imshow(bluechannel);
+
+% 3. Vytvořte z obrazů/videa PPG signál. Tzn. zrůměrujte obraz (každý snímek) po RGB
+% složkách. Pro každý snímek tedy získáte jednu (respektive 3 pokud mluvíme o 3 
+% barevných složkách) hodnotu (průměr pixelů v obraze) - z toho pak postupně celý 
+% signál. Využijte for cyklus.
+
+for i = 1:frames
+    frame = read(v,i);
+    redchannel = frame(:,:,1); % 1 = red, 2 = green, 3 = blue :,:,:,1,i (?)
+    greenchannel = frame(:,:,2);
+    bluechannel = frame(:,:,3);
+    red(i) = mean(mean(redchannel));
+    green(i) = mean(mean(greenchannel));
+    blue(i) = mean(mean(bluechannel));
+end
+
+% save data
+save('data.mat','red','green','blue','framerate');
+
+% 4. Vykreslete získáné PPG signály a vyhodnoťte, která barevná složka nese
+% nejhodnotnější informaci.
+
+%legend = {'red','green','blue'};
+
+figure(2);
+subplot(1,3,1);
+plot(red);
+title('red');
+subplot(1,3,2);
+plot(green);
+title('green');
+subplot(1,3,3);
+plot(blue);
+title('blue');
+
+
+
+% 5. Proveďte filtraci vybraného PPG signálu. Zvolte filtr typu fir1 a k
+% realizaci fitlrace funkci filtfilt. užitečná část signálu se projevuje na
+% frekvencích 0.5-3 Hz. Řád filtru volte poměrně vysoký, např. 96, jedná se
+% o značně úzkopásmovou propust.
+
+f = fir1(96,[0.5 3]/(framerate/2));
+
+filtered = filtfilt(f,1,red);
+
+% 6. Nalezněte peaky ve filtrovaném signále. Využijte funkci findpeaks.
+% Správně nastavte parametry.
+
+[pks,locs] = findpeaks(filtered,'MinPeakHeight',0.5,'MinPeakDistance',10);
+
+% 7. Vypočítejte průměrnou hodnotu tepové frekvence (TF). Neprve vypočtětě
+% hodnoty PP intervalů (tedy intervalů mezi jednotlivými srdečními stahy,
+% tj. peaky v signále) a následně přepočtěte na TF.
+
+pp = diff(locs);
+tf = mean(60./(pp/framerate)); % 60s/min / (pp/framerate) = bpm
+
+
+
+
+% 8. Zobrazte signál společně s detekovanými pozicemi PP peaků. 
+% Diskutujte možné vzniklé chyby.
+
+figure(3);
+plot(filtered);
+hold on;
+plot(locs,pks,'r*');
+hold off;
+
+
+% 9. Realizujte druhý způsob určení tepové frekvence skrze spektrální
+% oblast.
+% Vypočítejte spekrum dříve filtrovaného signálu a detekujte v něm maximum.
+% Spektrum i maximum zobrazte - maximum bude odpovídat tepové frekvenci.
+% Přepočtěte  na tepovou frekvenci. Při vykreslení a přepočtu
+% nezapomeňte správně nastavit frekvenční osu.
+% Srovnejte výpočet oběma metodami.
+
+
